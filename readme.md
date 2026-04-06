@@ -4,6 +4,8 @@ A modern, minimal, and fully client-side **bookmark management web app** built u
 
 This app allows users to organize bookmarks into draggable columns, similar to a lightweight Trello-style interface — all without any backend.
 
+![Screenshot](image.png)
+
 ---
 
 ## 🚀 Features
