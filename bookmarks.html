@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Bookmark Dashboard</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<style>
+.columns { gap: 10px; align-items: stretch; }
+.column { display: flex; flex-direction: column; position: relative; }
+.links { flex: 1; }
+.drop-indicator {
+  height: 6px;
+  background: #3b82f6;
+  border-radius: 999px;
+  margin: 4px 0;
+}
+.col-drop {
+  width: 4px;
+  background: #3b82f6;
+  border-radius: 999px;
+}
+</style>
+</head>
+
+<body class="bg-slate-950 text-white">
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+function App() {
+  const [columns, setColumns] = useState([]);
+  const [hoverEnd, setHoverEnd] = useState(false);
+  const [editingCol, setEditingCol] = useState(null);
+  const [newName, setNewName] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [title, setTitle] = useState("");
+  const [url, setUrl] = useState("");
+  const [selectedCol, setSelectedCol] = useState(0);
+
+  const [dragItem, setDragItem] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
+
+  const [dragCol, setDragCol] = useState(null);
+  const [colDropIndex, setColDropIndex] = useState(null);
+
+  useEffect(() => {
+    const stored = JSON.parse(localStorage.getItem("columns"));
+    if (stored) setColumns(stored);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("columns", JSON.stringify(columns));
+  }, [columns]);
+
+  const getNextName = () => {
+    let i = 1;
+    while (columns.find(c => c.name === "Column " + i)) i++;
+    return "Column " + i;
+  };
+
+  const addColumn = () => {
+    setColumns([...columns, { name: getNextName(), links: [] }]);
+  };
+
+  const deleteColumn = (i) => {
+    const updated = [...columns];
+    updated.splice(i, 1);
+    setColumns(updated);
+  };
+
+  const renameColumn = (i) => {
+    const updated = [...columns];
+    updated[i].name = newName || updated[i].name;
+    setColumns(updated);
+    setEditingCol(null);
+  };
+
+  const addBookmark = () => {
+    if (!title || !url || columns.length === 0) return;
+    const updated = [...columns];
+    updated[selectedCol].links.push({ title, url });
+    setColumns(updated);
+    setTitle(""); setUrl("");
+    setShowAdd(false);
+  };
+
+  const deleteBookmark = (c, i) => {
+    const updated = [...columns];
+    updated[c].links.splice(i, 1);
+    setColumns(updated);
+  };
+
+  const onDragStart = (col, index) => {
+    setDragItem({ col, index });
+  };
+
+  const onDragOverItem = (col, index, e) => {
+    e.preventDefault();
+    setDropTarget({ col, index });
+  };
+
+  const onDrop = () => {
+    if (!dragItem || !dropTarget) return;
+
+    const updated = [...columns];
+    const item = updated[dragItem.col].links.splice(dragItem.index, 1)[0];
+
+    let targetIndex = dropTarget.index;
+    if (dragItem.col === dropTarget.col && dragItem.index < dropTarget.index) {
+      targetIndex -= 1;
+    }
+
+    updated[dropTarget.col].links.splice(targetIndex, 0, item);
+
+    setColumns(updated);
+    setDragItem(null);
+    setDropTarget(null);
+  };
+
+  const onColDragStart = (index) => {
+    setDragCol(index);
+  };
+
+  const onColDragOver = (index, e) => {
+    e.preventDefault();
+    setColDropIndex(index);
+  };
+
+  const onColDrop = () => {
+    if (dragCol === null || colDropIndex === null) return;
+
+    const updated = [...columns];
+    const item = updated.splice(dragCol, 1)[0];
+    updated.splice(colDropIndex, 0, item);
+
+    setColumns(updated);
+    setDragCol(null);
+    setColDropIndex(null);
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto p-6">
+
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <button onClick={()=>setShowAdd(true)}
+          className="bg-blue-500 px-4 py-2 rounded-xl">
+          Add Bookmark
+        </button>
+      </div>
+
+      {columns.length === 0 && (
+        <div onClick={addColumn}
+          className="h-40 flex items-center justify-center border-2 border-dashed border-slate-700 rounded-xl cursor-pointer text-slate-400">
+          + Create New List
+        </div>
+      )}
+
+      <div className="columns flex justify-center">
+
+        {columns.map((col, colIndex) => (
+          <React.Fragment key={colIndex}>
+
+            {colDropIndex === colIndex && <div className="col-drop"></div>}
+
+            <div
+              draggable
+              onDragStart={()=>onColDragStart(colIndex)}
+              onDragOver={(e)=>onColDragOver(colIndex, e)}
+              onDrop={onColDrop}
+              className="column w-56 bg-slate-900 p-3 rounded-xl cursor-move group"
+            >
+
+              <div className="flex justify-between mb-2 items-center">
+                <div onClick={()=>{
+                  setEditingCol(colIndex);
+                  setNewName(col.name);
+                }} className="font-semibold cursor-pointer">
+                  {editingCol === colIndex ? (
+                    <input value={newName}
+                      onChange={e=>setNewName(e.target.value)}
+                      onBlur={()=>renameColumn(colIndex)}
+                      autoFocus
+                      className="bg-slate-800 p-1 rounded w-full"/>
+                  ) : col.name}
+                </div>
+
+                <button 
+                  onClick={()=>deleteColumn(colIndex)} 
+                  className="text-red-400 opacity-0 group-hover:opacity-100 transition">
+                  ×
+                </button>
+              </div>
+
+              <div className="links space-y-2"
+                onDragOver={(e)=>e.preventDefault()}
+                onDrop={onDrop}
+              >
+                {col.links.map((link, i) => {
+                  const icon = `https://www.google.com/s2/favicons?domain=${link.url}&sz=64`;
+
+                  return (
+                    <div key={i}>
+                      {dropTarget && dropTarget.col === colIndex && dropTarget.index === i && (
+                        <div className="drop-indicator"></div>
+                      )}
+
+                      <div draggable
+                        onDragStart={()=>onDragStart(colIndex, i)}
+                        onDragOver={(e)=>onDragOverItem(colIndex, i, e)}
+                        className="relative flex items-center gap-2 bg-slate-800 p-2 rounded text-sm cursor-move group">
+
+                        <button 
+                          onClick={()=>deleteBookmark(colIndex, i)}
+                          className="absolute top-1 right-1 text-red-400 opacity-0 group-hover:opacity-100 transition">
+                          ×
+                        </button>
+
+                        <img src={icon} className="w-5 h-5"/>
+                        <a href={link.url} target="_blank" className="truncate text-blue-400">
+                          {link.title}
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {dropTarget && dropTarget.col === colIndex && dropTarget.index === col.links.length && (
+                  <div className="drop-indicator"></div>
+                )}
+
+                <div onDragOver={(e)=>onDragOverItem(colIndex, col.links.length, e)}></div>
+              </div>
+            </div>
+
+          </React.Fragment>
+        ))}
+
+        {columns.length > 0 && (
+          <div
+            onMouseEnter={()=>setHoverEnd(true)}
+            onMouseLeave={()=>setHoverEnd(false)}
+            onClick={addColumn}
+            className="flex items-center justify-center w-10"
+          >
+            {hoverEnd && <div className="text-xl text-slate-400 cursor-pointer">+</div>}
+          </div>
+        )}
+
+      </div>
+
+      {showAdd && columns.length > 0 && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+          <div className="bg-slate-900 p-6 rounded-xl w-80 space-y-3">
+            <h2>Add Bookmark</h2>
+
+            <input placeholder="Title"
+              value={title}
+              onChange={e=>setTitle(e.target.value)}
+              className="w-full p-2 bg-slate-800 rounded"/>
+
+            <input placeholder="URL"
+              value={url}
+              onChange={e=>setUrl(e.target.value)}
+              className="w-full p-2 bg-slate-800 rounded"/>
+
+            <select value={selectedCol}
+              onChange={e=>setSelectedCol(e.target.value)}
+              className="w-full p-2 bg-slate-800 rounded">
+              {columns.map((c,i)=>(
+                <option key={i} value={i}>{c.name}</option>
+              ))}
+            </select>
+
+            <button onClick={addBookmark}
+              className="w-full bg-blue-500 py-2 rounded">
+              Save
+            </button>
+
+            <button onClick={()=>setShowAdd(false)}
+              className="w-full text-slate-400">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+
+</body>
+</html>
